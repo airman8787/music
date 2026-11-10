@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>四音フレーザー</title>
+<meta name="description" content="歌詞・ジャンル・スケールを決め、4音のモチーフをパッドで選ぶと、コード進行とメロディを自動で作るフレージングアプリ">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<header class="top">
+  <h1>四音フレーザー</h1>
+  <p>歌詞 → ジャンル → スケール → パッドで4音。コード進行とメロディを自動で作ります。</p>
+</header>
+
+<main>
+  <section class="card" id="s-lyrics">
+    <h2><span class="num">1</span>歌詞</h2>
+    <textarea id="lyrics" rows="9" spellcheck="false" placeholder="[Verse]&#10;まちのあかりがにじんで&#10;きみのこえをさがしてた&#10;&#10;[Chorus]&#10;ひかりのほうへ&#10;あるいていくよ"></textarea>
+    <p class="hint">1行＝1フレーズ。<code>[Verse]</code> <code>[Pre]</code> <code>[Chorus]</code> <code>[Bridge]</code>（Aメロ・Bメロ・サビ・Cメロも可）で区切れます。タグがなければ空行ごとに自動で割り当てます。空欄のままでもメロディだけ作れます。</p>
+    <div class="row wrap">
+      <label>1行の詰め方
+        <select id="density">
+          <option value="8">ゆったり（2小節に8音まで）</option>
+          <option value="12">ふつう（2小節に12音まで）</option>
+          <option value="16">詰める（2小節に16音まで）</option>
+        </select>
+      </label>
+      <button class="ghost" id="sample">サンプル歌詞を入れる</button>
+    </div>
+    <details id="count-box">
+      <summary>音数チェック（<span id="count-sum">0</span>行）</summary>
+      <p class="hint">漢字は読みが分からないため1字≒2音で概算しています。ずれる行は ± で直すか、ひらがなで書いてください。</p>
+      <ul id="count-list"></ul>
+    </details>
+  </section>
+
+  <section class="card" id="s-genre">
+    <h2><span class="num">2</span>ジャンル<small>複数可・選んだ順に役割が付きます</small></h2>
+    <p class="hint"><b class="role r0">主語</b>＝形式とコード進行　<b class="role r1">動力</b>＝ドラムとベース　<b class="role r2">色</b>＝音色。4つ目以降はスケールと進行の候補に加わります。</p>
+    <div id="genres"></div>
+  </section>
+
+  <section class="card" id="s-scale">
+    <h2><span class="num">3</span>スケールとキー</h2>
+    <div class="row">
+      <label>キー（主音）<select id="root"></select></label>
+    </div>
+    <div id="scales" class="chips"></div>
+  </section>
+
+  <section class="card" id="s-motif">
+    <h2><span class="num">4</span>四音モチーフ<small>主旋律の核になる4音</small></h2>
+    <div id="slots" class="slots"></div>
+    <p class="hint" id="motif-hint"></p>
+    <div id="pads" class="pads"></div>
+    <div class="row wrap">
+      <button id="motif-play">▶ モチーフを聴く</button>
+      <button class="ghost" id="motif-clear">クリア</button>
+      <label>作例から<select id="preset"></select></label>
+    </div>
+    <h3>リズム</h3>
+    <div id="rhythms" class="chips"></div>
+  </section>
+
+  <section class="card" id="s-result">
+    <h2><span class="num">5</span>できたフレーズ</h2>
+    <div id="empty" class="empty">パッドで4音を選ぶと、ここにコード進行とメロディが出ます。</div>
+    <div id="result" hidden>
+      <div id="summary" class="summary"></div>
+      <div class="row wrap tools">
+        <span class="mutes" id="mutes"></span>
+        <button class="ghost" id="dl-midi">MIDIを保存</button>
+        <button class="ghost" id="copy-text">譜面テキストをコピー</button>
+      </div>
+      <div id="score"></div>
+      <details id="suno-box">
+        <summary>Suno用テキスト</summary>
+        <p class="hint">Styleは編成と音像、Lyricsの角括弧は区間ごとの役割です。音名どおりに再現されるとは限らないので、生成ごとに耳で確かめてください。</p>
+        <label class="block">Style <span id="style-n" class="counter"></span><button class="ghost mini" data-copy="suno-style">コピー</button>
+          <textarea id="suno-style" rows="4" readonly></textarea></label>
+        <label class="block">Lyrics <span id="lyrics-n" class="counter"></span><button class="ghost mini" data-copy="suno-lyrics">コピー</button>
+          <textarea id="suno-lyrics" rows="10" readonly></textarea></label>
+      </details>
+    </div>
+  </section>
+  <p class="foot">BPM・進行・グルーヴは制作の出発点で、ジャンルの規格ではありません。音は端末内で合成しています。</p>
+</main>
+
+<footer class="transport">
+  <button id="play" class="play" aria-label="再生">▶</button>
+  <button id="loop" class="ghost toggle on" aria-pressed="true" title="ループ">⟲</button>
+  <div class="bpm">
+    <button class="ghost mini" id="bpm-down" aria-label="BPMを下げる">−</button>
+    <input type="range" id="bpm" min="50" max="220" step="1">
+    <button class="ghost mini" id="bpm-up" aria-label="BPMを上げる">＋</button>
+    <input type="number" id="bpm-num" min="50" max="220" inputmode="numeric">
+    <span class="bpm-label">BPM<small id="bpm-range"></small></span>
+  </div>
+  <button id="reroll" title="同じモチーフで別の進行とメロディ">🎲 別案</button>
+</footer>
+<div id="toast" class="toast" hidden></div>
+
+<script src="js/theory.js"></script>
+<script src="js/data.js"></script>
+<script src="js/lyrics.js"></script>
+<script src="js/generator.js"></script>
+<script src="js/arrange.js"></script>
+<script src="js/export.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
