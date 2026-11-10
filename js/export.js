@@ -25,7 +25,7 @@
     const us = Math.round(60000000 / bpm);
     const tracks = [track([
       { tick: 0, ord: 0, data: [0xff, 0x51, 3, (us >> 16) & 255, (us >> 8) & 255, us & 255] },
-      { tick: 0, ord: 0, data: [0xff, 0x58, 4, 4, 2, 24, 8] },
+      { tick: 0, ord: 0, data: [0xff, 0x58, 4, song.meter.ts[0], song.meter.ts[1], 24, 8] },
     ])];
     const mk = (name, ch, program, notes) => {
       const es = [{ tick: 0, ord: 0, data: meta(3, name) }];
@@ -50,7 +50,7 @@
 
   /* 資料05の表記：「E4(1)」＝四分音符1拍、「|」は小節線 */
   PF.toText = function (song, bpm) {
-    const L = [`Key: ${song.key} ${song.scale.name}（${song.scale.en}） / BPM ${bpm} / 4/4`,
+    const L = [`Key: ${song.key} ${song.scale.name}（${song.scale.en}） / BPM ${bpm}（四分音符） / ${song.meter.name}${song.meter.note ? '（' + song.meter.note + '）' : ''}`,
       `モチーフ: ${song.motifNames.map((n, i) => `${n}(${beats(song.rhythm[i])})`).join(' ')}`, ''];
     song.sections.forEach((sec) => {
       L.push(`[${sec.label}]  ${sec.chords.map((b) => b.map((c) => c.name).join(' ')).join(' | ')}`);
@@ -61,7 +61,7 @@
           const ns = line.notes.filter((n) => n.bar === line.bar0 + b);
           let pos = 0; const parts = [];
           ns.forEach((n) => { if (n.pos > pos) parts.push(`休(${beats(n.pos - pos)})`); parts.push(`${n.name}(${beats(n.d)})`); pos = n.pos + n.d; });
-          if (pos < 8) parts.push(`休(${beats(8 - pos)})`);
+          if (pos < song.meter.e) parts.push(`休(${beats(song.meter.e - pos)})`);
           bars.push(parts.join(' '));
         }
         L.push('  ' + bars.join(' | '));
@@ -80,7 +80,7 @@
     let style = r.subject.suno;
     if (r.drive !== r.subject) style += `, driven by a ${r.drive.name} groove`;
     if (r.color !== r.subject && r.color !== r.drive) style += `, colored with ${r.color.name} timbres`;
-    style += `, ${bpm} BPM, 4/4, key of ${song.key} ${mode}, built around one recurring four-note motif`;
+    style += `, ${bpm} BPM, ${song.meter.name}${song.meter.note ? ' grouped ' + song.meter.note : ''}, key of ${song.key} ${mode}, built around one recurring four-note motif`;
     const motif = song.motifNames.join('–');
     const rhythm = song.rhythm.map((d) => DUR[d] || d / 2 + ' beats').join('–');
     const ch = (sec) => sec.chords.slice(0, 8).map((b) => b.map((c) => c.name).join(' ')).join(' | ');

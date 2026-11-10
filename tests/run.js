@@ -19,7 +19,12 @@ PF.GENRES.forEach((ge) => { ge.progs.forEach((p) => PF.parseProg(p, 0)); ok(PF.G
 ok(PF.parseChord('bVII13', 0).name === 'Bb13' && PF.parseChord('vi9', 0).name === 'Am9' && PF.parseChord('ii7', 2, false).name === 'Em7', 'コード名');
 
 // リズムセルは常に1小節ぶん
-PF.RHYTHMS.forEach((r) => { for (let k = 1; k <= 8; k++) { const c = PF._cellsFor(r.d, k); ok(c.length === k && c.reduce((s, x) => s + x.d, 0) === 8, `cells ${r.name} k=${k}`); } });
+Object.values(PF.METERS).forEach((mt) => {
+  mt.rhythms.forEach((d) => { ok(d.length === 4 && d.reduce((s, x) => s + x, 0) === mt.e, 'rhythm ' + mt.name); for (let k = 1; k <= mt.e; k++) { const c = PF._cellsFor(d, k); ok(c.length === k && c.reduce((s, x) => s + x.d, 0) === mt.e, `cells ${mt.name} k=${k}`); } });
+  if (mt.groove) Object.entries(mt.groove).forEach(([k, v]) => typeof v === 'string' && ok(v.length % (mt.e * 2) === 0, `groove ${mt.name}.${k}`));
+});
+Object.entries(PF.GROOVES).forEach(([id, gv]) => Object.entries(gv).forEach(([k, v]) => typeof v === 'string' && ok(v.length % 16 === 0, `groove ${id}.${k}`)));
+const METERS = Object.keys(PF.METERS);
 
 const lyric = PF.parseLyrics('[Verse]\nまちのあかりがにじんで\nきみのこえをさがしてた\n[Pre]\nもうすこしだけ\nこのままで\n[Chorus]\nひかりのほうへ\nあるいていくよ\nひかりのほうへ\nまだおわらない\n[Bridge]\nI will find you in the morning light');
 let n = 0;
@@ -28,10 +33,11 @@ PF.GENRES.forEach((ge) => ge.scales.forEach((sid) => {
     const scale = PF.SCALES[sid], lay = PF.padLayout(root, scale);
     const rnd = PF.mulberry32(seed * 97 + root);
     const motif = [0, 0, 0, 0].map(() => Math.floor(rnd() * lay.pads.length));
-    const rh = PF.RHYTHMS[seed % PF.RHYTHMS.length].d;
-    const song = PF.generate({ sections: seed === 3 ? null : lyric, genreIds: [ge.id, PF.GENRES[(n * 7) % PF.GENRES.length].id], scaleId: sid, rootPc: root, motif, rhythm: rh, seed, density: [8, 12, 16][seed % 3] });
+    const mid0 = METERS[n % METERS.length], rh = PF.METERS[mid0].rhythms[seed % 5];
+    const song = PF.generate({ sections: seed === 3 ? null : lyric, genreIds: [ge.id, PF.GENRES[(n * 7) % PF.GENRES.length].id], scaleId: sid, rootPc: root, motif, rhythm: rh, meter: mid0, seed, density: [8, 12, 16][seed % 3] });
     n++;
-    const tag = `${ge.id}/${sid}/${root}/${seed}`;
+    const tag = `${ge.id}/${sid}/${root}/${seed}/${mid0}`;
+    ok(song.totalBeats === song.totalBars * PF.METERS[mid0].e / 2 && song.melody.every((m) => m.pos + m.d <= PF.METERS[mid0].e), tag + ' 小節長');
     const pcs = scale.iv.map((i) => (i + root) % 12);
     ok(song.melody.every((m) => pcs.includes(m.midi % 12)), tag + ' スケール外の音');
     ok(song.melody.every((m) => m.midi >= 40 && m.midi <= 96), tag + ' 音域');

@@ -92,6 +92,7 @@ summary { cursor: pointer; font-size: 13px; color: var(--dim); }
 .sys { display: block; width: 100%; background: #11141c; border-radius: 8px; margin-bottom: 6px; cursor: pointer; }
 .sys .bar { stroke: #2b3040; stroke-width: 1; }
 .sys .beat { stroke: #1d2130; stroke-width: 1; }
+.sys .beat.strong { stroke: #343a50; }
 .sys .chord { fill: var(--acc); font-size: 12px; font-weight: 700; }
 .sys .note { fill: #7fb2ff; }
 .sys .note.motif { fill: var(--acc2); }

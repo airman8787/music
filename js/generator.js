@@ -61,13 +61,13 @@
   }
   PF._cellsFor = cellsFor;
 
-  function distribute(N, B) {
+  function distribute(N, B, E) {
     const c = Array(B).fill(Math.floor(N / B));
     for (let i = 0; i < N % B; i++) c[i]++;
-    if (B > 1 && c[B - 1] >= 3) { const i = c.findIndex((x) => x < 8); if (i >= 0 && i < B - 1) { c[i]++; c[B - 1]--; } }
+    if (B > 1 && c[B - 1] >= 3) { const i = c.findIndex((x) => x < E); if (i >= 0 && i < B - 1) { c[i]++; c[B - 1]--; } }
     let over = 0;
-    for (let i = 0; i < B; i++) if (c[i] > 8) { over += c[i] - 8; c[i] = 8; }
-    for (let i = 0; i < B && over > 0; i++) { const a = Math.min(over, 8 - c[i]); c[i] += a; over -= a; }
+    for (let i = 0; i < B; i++) if (c[i] > E) { over += c[i] - E; c[i] = E; }
+    for (let i = 0; i < B && over > 0; i++) { const a = Math.min(over, E - c[i]); c[i] += a; over -= a; }
     return c;
   }
 
@@ -90,7 +90,9 @@
     const scalePcs = scale.iv.map((i) => (i + root) % 12);
     const parentPcs = (PF.SCALES[scale.parent] || scale).iv.map((i) => (i + root) % 12);
     const roles = PF.roles(o.genreIds || []);
-    const density = o.density || 12;
+    const meter = PF.METERS[o.meter] || PF.METERS['4/4'], E = meter.e, BB = E / 2;
+    const strong = (pos) => meter.strong.includes(pos);
+    const density = Math.max(2, Math.round(((o.density || 12) * E) / 8));
     const prog = (s) => PF.parseProg(s, root, flats);
 
     /* 音とコードの相性：コードトーン=1、半音でぶつかる音=-1.2、その他=0.25 */
@@ -103,9 +105,9 @@
       }
       return 0.25;
     }
-    const chordAt = (bar, pos) => bar[Math.min(bar.length - 1, Math.floor((pos * bar.length) / 8))];
+    const chordAt = (bar, pos) => bar[Math.min(bar.length - 1, Math.floor((pos * bar.length) / E))];
     const fit = (p) => { let a = 0, n = 0; p.bars.forEach((b) => b.forEach((c) => c.pcs.forEach((x) => { n++; if (parentPcs.includes(x)) a++; }))); return a / n; };
-    const motifFit = (p) => { let s = 0, pos = 0; M.forEach((li, i) => { s += R[i] * q(lad[li], chordAt(p.bars[0], pos)); pos += R[i]; }); return s / 8; };
+    const motifFit = (p) => { let s = 0, pos = 0; M.forEach((li, i) => { s += R[i] * q(lad[li], chordAt(p.bars[0], pos)); pos += R[i]; }); return s / E; };
 
     /* --- コード進行の候補：スケール固有＋選んだジャンルの定番 --- */
     const cand = {};
@@ -157,7 +159,7 @@
 
     const cache = {};
     function makeLine(sec, line, lineIdx, bar0, prev) {
-      const B = line.nBars, counts = distribute(line.count, B);
+      const B = line.nBars, counts = distribute(line.count, B, E);
       const key = [sec.type, lineIdx % 2, counts.join(','), sec.chords.slice(bar0, bar0 + B).map((b) => b.map((c) => c.sym).join('+')).join('/')].join(':');
       if (cache[key]) return cache[key].map((n) => Object.assign({}, n, { bar: n.bar + bar0 }));
       const notes = [];
@@ -176,7 +178,7 @@
             if (!ps.every(valid)) continue;
             let s = 0, w = 0;
             ps.forEach((li, i) => {
-              const c = cells[i], wt = c.d * (c.pos % 4 === 0 ? 1.5 : 1);
+              const c = cells[i], wt = c.d * (strong(c.pos) ? 1.5 : 1);
               s += wt * q(lad[li], chordAt(bar, c.pos)); w += wt;
               if (lad[li] < LO || lad[li] > HI) s -= 0.5 * wt;
             });
@@ -186,7 +188,7 @@
           }
         }
         let ps = realize(cells, V, shift).map((li) => Math.max(0, Math.min(lad.length - 1, li)));
-        if (!exact) ps = ps.map((li, i) => (cells[i].pos % 4 === 0 || cells[i].d >= 4) ? improve(li, chordAt(bar, cells[i].pos), 0, 2) : li);
+        if (!exact) ps = ps.map((li, i) => (strong(cells[i].pos) || cells[i].d >= 4) ? improve(li, chordAt(bar, cells[i].pos), 0, 2) : li);
         ps.forEach((li, i) => notes.push({ bar: bar0 + b, pos: cells[i].pos, d: cells[i].d, li, exact, motif: op === 'orig' && shift === 0 }));
         prev = ps[ps.length - 1];
       }
@@ -238,11 +240,11 @@
     let bar = 0;
     sections.forEach((sec, si) => {
       sec.bar0 = bar;
-      sec.chords.forEach((b, bi) => b.forEach((c, ci) => chords.push({ t: (bar + bi) * 4 + (ci * 4) / b.length, d: 4 / b.length, chord: c, sec: si })));
+      sec.chords.forEach((b, bi) => b.forEach((c, ci) => chords.push({ t: (bar + bi) * BB + (ci * BB) / b.length, d: BB / b.length, chord: c, sec: si })));
       sec.lines.forEach((line) => line.notes.forEach((n) => {
         n.midi = lad[n.li];
         n.name = PF.midiName(n.midi, flats);
-        n.t = (bar + n.bar) * 4 + n.pos / 2;
+        n.t = (bar + n.bar) * BB + n.pos / 2;
         n.dur = n.d / 2;
         melody.push(n);
       }));
@@ -252,7 +254,7 @@
       key: PF.pcName(root, flats), rootPc: root, scale, scaleId: o.scaleId, flats, roles,
       motif: M.map((li) => lad[li]), motifNames: M.map((li) => PF.midiName(lad[li], flats)), rhythm: R,
       progs: { chorus: chorusP, verse: verseP, pre: preP, bridge: bridgeP },
-      sections, melody, chords, totalBars: bar, totalBeats: bar * 4,
+      sections, melody, chords, totalBars: bar, totalBeats: bar * BB, meter, bb: BB,
     };
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

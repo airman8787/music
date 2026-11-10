@@ -4,6 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>四音フレーザー</title>
+<meta name="theme-color" content="#101218">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="四音フレーザー">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <meta name="description" content="歌詞・ジャンル・スケールを決め、4音のモチーフをパッドで選ぶと、コード進行とメロディを自動で作るフレージングアプリ">
 <link rel="stylesheet" href="css/style.css">
 </head>
@@ -43,8 +48,9 @@
 
   <section class="card" id="s-scale">
     <h2><span class="num">3</span>スケールとキー</h2>
-    <div class="row">
+    <div class="row wrap">
       <label>キー（主音）<select id="root"></select></label>
+      <label>拍子<select id="meter"></select></label>
     </div>
     <div id="scales" class="chips"></div>
   </section>
@@ -59,7 +65,7 @@
       <button class="ghost" id="motif-clear">クリア</button>
       <label>作例から<select id="preset"></select></label>
     </div>
-    <h3>リズム</h3>
+    <h3>リズム<small id="meter-note"></small></h3>
     <div id="rhythms" class="chips"></div>
   </section>
 
@@ -84,7 +90,7 @@
       </details>
     </div>
   </section>
-  <p class="foot">BPM・進行・グルーヴは制作の出発点で、ジャンルの規格ではありません。音は端末内で合成しています。</p>
+  <p class="foot">BPM・進行・グルーヴは制作の出発点で、ジャンルの規格ではありません。4/4以外の拍子ではドラムとベースが拍子専用の型になり、ジャンルは音色とコード進行に効きます。音は端末内で合成しています。</p>
 </main>
 
 <footer class="transport">

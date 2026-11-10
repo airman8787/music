@@ -7,7 +7,7 @@
 
   const S = Object.assign({
     lyrics: '', overrides: {}, density: 12, genres: ['pop'], scaleId: 'ionian', root: 0,
-    motif: [null, null, null, null], rhythm: 0, bpm: 104, bpmAuto: true, seed: 1, loop: true,
+    motif: [null, null, null, null], rhythm: 0, meter: '4/4', bpm: 104, bpmAuto: true, seed: 1, loop: true,
     mutes: { lead: false, chord: false, bass: false, drums: false },
   }, load());
   let cursor = S.motif.indexOf(null), song = null, events = null, systems = [], lastSys = null;
@@ -22,6 +22,8 @@
   const flats = () => PF.useFlats(S.root, scale());
   const sound = () => { const r = roles(); return { lead: r.color.lead, keys: r.color.keys, bass: r.drive.bass, kit: r.drive.kit }; };
   const full = () => S.motif.every((x) => x != null);
+  const meter = () => PF.METERS[S.meter] || PF.METERS['4/4'];
+  const rhythm = () => meter().rhythms[S.rhythm] || meter().rhythms[0];
 
   /* ---------- 1 歌詞 ---------- */
   function renderCounts() {
@@ -101,7 +103,7 @@
     $('preset').innerHTML = `<option value="">感情から選ぶ（${ps.length}例）</option>` + ps.map((p, i) => `<option value="${i}">${esc(p.name)}</option>`).join('');
     $('preset').onchange = (e) => {
       const p = ps[+e.target.value]; if (!p || e.target.value === '') return;
-      S.motif = p.pads.slice(); S.rhythm = p.r; cursor = -1;
+      S.motif = p.pads.slice(); S.rhythm = S.meter === '4/4' ? p.r : 0; cursor = -1;
       renderPads(); renderRhythms(); update(); playMotif();
     };
     $('motif-play').disabled = !full();
@@ -115,20 +117,20 @@
     renderPads(); update();
   }
   function renderRhythms() {
-    $('rhythms').innerHTML = PF.RHYTHMS.map((r, i) => `<button class="chip rh ${i === S.rhythm ? 'on' : ''}" data-r="${i}" aria-pressed="${i === S.rhythm}">
+    $('rhythms').innerHTML = meter().rhythms.map((d, i) => ({ d, name: PF.rhythmName(d) })).map((r, i) => `<button class="chip rh ${i === S.rhythm ? 'on' : ''}" data-r="${i}" aria-pressed="${i === S.rhythm}">
       <i>${r.d.map((d) => `<u style="width:${d * 7}px"></u>`).join('')}</i>${r.name}</button>`).join('');
   }
   function playMotif() {
     if (!full()) return;
     const lay = layout();
-    PF.audio.phrase(S.motif.map((p) => lay.pads[p]), PF.RHYTHMS[S.rhythm].d, S.bpm, sound().lead);
+    PF.audio.phrase(S.motif.map((p) => lay.pads[p]), rhythm(), S.bpm, sound().lead);
   }
 
   /* ---------- BPM ---------- */
   function renderBpm() {
     const d = roles().drive;
     $('bpm').value = S.bpm; $('bpm-num').value = S.bpm;
-    $('bpm-range').textContent = `${d.name} ${d.bpm[0]}–${d.bpm[1]}`;
+    $('bpm-range').textContent = S.meter === '4/4' ? `${d.name} ${d.bpm[0]}–${d.bpm[1]}` : `四分音符基準・${S.meter}`;
   }
   function setBpm(v, manual) {
     v = Math.max(50, Math.min(220, Math.round(+v) || S.bpm));
@@ -144,22 +146,22 @@
     const secs = PF.parseLyrics(S.lyrics, S.overrides);
     const was = PF.audio.isPlaying(), pos = PF.audio.position();
     if (!full()) { song = null; stop(); $('result').hidden = true; $('empty').hidden = false; $('play').disabled = true; return; }
-    song = PF.generate({ sections: secs, genreIds: S.genres, scaleId: S.scaleId, rootPc: S.root, motif: S.motif, rhythm: PF.RHYTHMS[S.rhythm].d, seed: S.seed, density: S.density });
+    song = PF.generate({ sections: secs, genreIds: S.genres, scaleId: S.scaleId, rootPc: S.root, motif: S.motif, rhythm: rhythm(), meter: S.meter, seed: S.seed, density: S.density });
     events = PF.arrange(song);
     $('result').hidden = false; $('empty').hidden = true; $('play').disabled = false;
     renderSummary(); renderScore(); renderSuno();
-    if (was) start(pos < song.totalBeats ? Math.floor(pos / 4) * 4 : 0);
+    if (was) start(pos < song.totalBeats ? Math.floor(pos / song.bb) * song.bb : 0);
   }
   function renderSummary() {
     const r = song.roles;
     const role = r.all.length > 1 ? `<span><span class="role r0">主語</span>${esc(r.subject.name)}</span><span><span class="role r1">動力</span>${esc(r.drive.name)}</span><span><span class="role r2">色</span>${esc(r.color.name)}</span>` : `<span>${esc(r.subject.name)}</span>`;
-    $('summary').innerHTML = `<span><b>${song.key} ${esc(song.scale.name)}</b></span><span><b>${S.bpm}</b> BPM</span><span>${song.totalBars}小節</span>
+    $('summary').innerHTML = `<span><b>${song.key} ${esc(song.scale.name)}</b></span><span><b>${S.bpm}</b> BPM</span><span><b>${song.meter.name}</b>${song.meter.note ? ' (' + song.meter.note + ')' : ''}</span><span>${song.totalBars}小節</span>
       <span>モチーフ <b>${song.motifNames.join(' – ')}</b></span>${role}`;
   }
   function renderScore() {
     const box = $('score'), W = Math.max(280, box.clientWidth || 600), per = W >= 640 ? 4 : 2;
     const ms = song.melody.map((n) => n.midi), lo = Math.min(...ms) - 1, hi = Math.max(...ms) + 1;
-    const RH = 6, TOP = 22, NH = (hi - lo + 1) * RH, H = TOP + NH + 22, bw = W / per;
+    const E = song.meter.e, RH = 6, TOP = 22, NH = (hi - lo + 1) * RH, H = TOP + NH + 22, bw = W / per;
     const y = (m) => TOP + (hi - m) * RH;
     systems = [];
     let html = '';
@@ -172,13 +174,13 @@
         for (let m = lo; m <= hi; m++) if (m % 12 === song.rootPc) g += `<line class="tonic" x1="0" x2="${n * bw}" y1="${y(m) + RH / 2}" y2="${y(m) + RH / 2}"/>`;
         for (let b = 0; b < n; b++) {
           const x = b * bw;
-          for (let q = 1; q < 4; q++) g += `<line class="beat" x1="${x + (q * bw) / 4}" x2="${x + (q * bw) / 4}" y1="${TOP}" y2="${TOP + NH}"/>`;
+          for (let q = 1; q < E; q++) if (q % 2 === 0 || E % 2) g += `<line class="${song.meter.strong.includes(q) ? 'beat strong' : 'beat'}" x1="${x + (q * bw) / E}" x2="${x + (q * bw) / E}" y1="${TOP}" y2="${TOP + NH}"/>`;
           if (b) g += `<line class="bar" x1="${x}" x2="${x}" y1="4" y2="${H - 4}"/>`;
           sec.chords[b0 + b].forEach((c, ci, arr) => (g += `<text class="chord" x="${x + (ci * bw) / arr.length + 6}" y="15">${esc(c.name)}</text>`));
         }
         notes.filter((nn) => nn.bar >= b0 && nn.bar < b0 + n).forEach((nn) => {
-          const x = (nn.bar - b0) * bw + (nn.pos / 8) * bw;
-          g += `<rect class="note ${nn.motif ? 'motif' : ''}" x="${(x + 1).toFixed(1)}" y="${y(nn.midi)}" width="${Math.max(3, (nn.d / 8) * bw - 2).toFixed(1)}" height="${RH}" rx="2"><title>${nn.name}</title></rect>`;
+          const x = (nn.bar - b0) * bw + (nn.pos / E) * bw;
+          g += `<rect class="note ${nn.motif ? 'motif' : ''}" x="${(x + 1).toFixed(1)}" y="${y(nn.midi)}" width="${Math.max(3, (nn.d / E) * bw - 2).toFixed(1)}" height="${RH}" rx="2"><title>${nn.name}</title></rect>`;
           if (nn.lyric) g += `<text class="lyr" x="${(x + 2).toFixed(1)}" y="${H - 7}">${esc(nn.lyric)}</text>`;
         });
         g += `<line class="ph" x1="0" x2="0" y1="2" y2="${H - 2}" visibility="hidden"/>`;
@@ -213,7 +215,7 @@
   function frame() {
     const pos = PF.audio.position();
     if (pos < 0) return;
-    const bar = pos / 4, sys = systems.find((s) => bar >= s.bar0 && bar < s.bar0 + s.n);
+    const bar = pos / song.bb, sys = systems.find((s) => bar >= s.bar0 && bar < s.bar0 + s.n);
     if (sys !== lastSys) {
       if (lastSys) lastSys.ph.setAttribute('visibility', 'hidden');
       if (sys) { sys.ph.setAttribute('visibility', 'visible'); sys.el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
@@ -235,7 +237,11 @@
     S.genres = S.genres.filter((id) => PF.GENRE[id]);
     S.motif = S.motif.map((p) => (p != null && p < layout().pads.length ? p : null));
     cursor = S.motif.indexOf(null);
+    if (!PF.METERS[S.meter]) S.meter = '4/4';
+    if (!meter().rhythms[S.rhythm]) S.rhythm = 0;
     $('lyrics').value = S.lyrics; $('density').value = S.density;
+    $('meter').innerHTML = Object.values(PF.METERS).map((m) => `<option value="${m.name}" ${m.name === S.meter ? 'selected' : ''}>${m.name}${m.note ? '（' + m.note + '）' : ''}</option>`).join('');
+    $('meter').onchange = (e) => { S.meter = e.target.value; S.rhythm = 0; renderRhythms(); renderBpm(); update(); };
     renderGenres(); renderScales(); renderPads(); renderRhythms(); renderBpm(); renderCounts();
     $('mutes').innerHTML = [['lead', 'メロ'], ['chord', 'コード'], ['bass', 'ベース'], ['drums', 'ドラム']].map(([k, n]) =>
       `<button class="ghost mini toggle ${S.mutes[k] ? '' : 'on'}" data-mute="${k}" aria-pressed="${!S.mutes[k]}">${n}</button>`).join('');
@@ -264,7 +270,7 @@
     $('bpm-up').onclick = () => setBpm(S.bpm + 1, true);
     $('reroll').onclick = () => { if (!full()) return toast('先にパッドで4音を選んでください'); S.seed = (S.seed % 9999) + 1; update(); toast('別案 #' + S.seed); };
     $('mutes').onclick = (e) => { const b = e.target.closest('[data-mute]'); if (!b) return; const k = b.dataset.mute; S.mutes[k] = !S.mutes[k]; b.classList.toggle('on', !S.mutes[k]); b.setAttribute('aria-pressed', !S.mutes[k]); PF.audio.setMute(k, S.mutes[k]); save(); };
-    $('score').onclick = (e) => { const s = e.target.closest('.sys'); if (s) start(+s.dataset.bar * 4); };
+    $('score').onclick = (e) => { const s = e.target.closest('.sys'); if (s) start(+s.dataset.bar * song.bb); };
     $('dl-midi').onclick = () => {
       const blob = new Blob([PF.toMidi(song, events, S.bpm)], { type: 'audio/midi' }), a = document.createElement('a');
       a.href = URL.createObjectURL(blob); a.download = `phrase_${song.key}_${song.scaleId}_${S.bpm}bpm.mid`; a.click();

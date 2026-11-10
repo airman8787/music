@@ -1,0 +1,11 @@
+{
+  "name": "四音フレーザー",
+  "short_name": "四音フレーザー",
+  "description": "4音のモチーフからコード進行とメロディを作るフレージングアプリ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101218",
+  "theme_color": "#101218",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
